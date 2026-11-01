@@ -73,6 +73,147 @@ impl SignalStr {
     }
 }
 
+pub struct ReactiveStore {
+    pub str_keys: Vec<string>,
+    pub str_vals: Vec<string>,
+    pub int_keys: Vec<string>,
+    pub int_vals: Vec<i64>,
+    pub bool_keys: Vec<string>,
+    pub bool_vals: Vec<bool>,
+    pub dirty_keys: Vec<string>,
+    pub version: i64,
+}
+
+impl ReactiveStore {
+    pub fn new() -> ReactiveStore {
+        return ReactiveStore {
+            str_keys: Vec::<string>::new(),
+            str_vals: Vec::<string>::new(),
+            int_keys: Vec::<string>::new(),
+            int_vals: Vec::<i64>::new(),
+            bool_keys: Vec::<string>::new(),
+            bool_vals: Vec::<bool>::new(),
+            dirty_keys: Vec::<string>::new(),
+            version: 1,
+        };
+    }
+
+    pub fn set_str(&mut self, key: string, val: string) {
+        let mut found = false;
+        let mut i: usize = 0;
+        while i < self.str_keys.len() {
+            if self.str_keys[i] == key {
+                if self.str_vals[i] != val {
+                    self.str_vals[i] = val;
+                    self.dirty_keys.push(key.clone());
+                    self.version += 1;
+                }
+                found = true;
+                break;
+            }
+            i += 1;
+        }
+        if !found {
+            self.str_keys.push(key.clone());
+            self.str_vals.push(val);
+            self.dirty_keys.push(key);
+            self.version += 1;
+        }
+    }
+
+    pub fn get_str(&self, key: string) -> string {
+        let mut i: usize = 0;
+        while i < self.str_keys.len() {
+            if self.str_keys[i] == key {
+                return self.str_vals[i].clone();
+            }
+            i += 1;
+        }
+        return "".to_string();
+    }
+
+    pub fn set_int(&mut self, key: string, val: i64) {
+        let mut found = false;
+        let mut i: usize = 0;
+        while i < self.int_keys.len() {
+            if self.int_keys[i] == key {
+                if self.int_vals[i] != val {
+                    self.int_vals[i] = val;
+                    self.dirty_keys.push(key.clone());
+                    self.version += 1;
+                }
+                found = true;
+                break;
+            }
+            i += 1;
+        }
+        if !found {
+            self.int_keys.push(key.clone());
+            self.int_vals.push(val);
+            self.dirty_keys.push(key);
+            self.version += 1;
+        }
+    }
+
+    pub fn get_int(&self, key: string) -> i64 {
+        let mut i: usize = 0;
+        while i < self.int_keys.len() {
+            if self.int_keys[i] == key {
+                return self.int_vals[i];
+            }
+            i += 1;
+        }
+        return 0;
+    }
+
+    pub fn set_bool(&mut self, key: string, val: bool) {
+        let mut found = false;
+        let mut i: usize = 0;
+        while i < self.bool_keys.len() {
+            if self.bool_keys[i] == key {
+                if self.bool_vals[i] != val {
+                    self.bool_vals[i] = val;
+                    self.dirty_keys.push(key.clone());
+                    self.version += 1;
+                }
+                found = true;
+                break;
+            }
+            i += 1;
+        }
+        if !found {
+            self.bool_keys.push(key.clone());
+            self.bool_vals.push(val);
+            self.dirty_keys.push(key);
+            self.version += 1;
+        }
+    }
+
+    pub fn get_bool(&self, key: string) -> bool {
+        let mut i: usize = 0;
+        while i < self.bool_keys.len() {
+            if self.bool_keys[i] == key {
+                return self.bool_vals[i];
+            }
+            i += 1;
+        }
+        return false;
+    }
+
+    pub fn toggle_bool(&mut self, key: string) {
+        let cur = self.get_bool(key.clone());
+        self.set_bool(key, !cur);
+    }
+
+    pub fn has_dirty(&self) -> bool {
+        return self.dirty_keys.len() > 0;
+    }
+
+    pub fn clear_dirty(&mut self) {
+        self.dirty_keys = Vec::<string>::new();
+    }
+}
+
 // ==========================================
 // 2. Build Context & Theming
 // ==========================================
@@ -304,6 +445,132 @@ impl SpringTicker {
         let delta = if diff > 0 { (diff / self.speed) + 1 } else { (diff / self.speed) - 1 };
         self.current += delta;
         return true;
+    }
+}
+
+pub fn tw_lerp_i64(a: i64, b: i64, progress_mille: i64) -> i64 {
+    let p = if progress_mille < 0 { 0 } else if progress_mille > 1000 { 1000 } else { progress_mille };
+    return a + ((b - a) * p) / 1000;
+}
+
+pub fn tw_lerp_color(c1: Color, c2: Color, progress_mille: i64) -> Color {
+    let r = tw_lerp_i64(c1.r, c2.r, progress_mille);
+    let g = tw_lerp_i64(c1.g, c2.g, progress_mille);
+    let b = tw_lerp_i64(c1.b, c2.b, progress_mille);
+    let a = tw_lerp_i64(c1.a, c2.a, progress_mille);
+    return Color::rgba(r, g, b, a);
+}
+
+pub struct TransitionState {
+    pub id: string,
+    pub current_r: i64,
+    pub current_g: i64,
+    pub current_b: i64,
+    pub current_a: i64,
+    pub target_r: i64,
+    pub target_g: i64,
+    pub target_b: i64,
+    pub target_a: i64,
+    pub duration_ms: i64,
+    pub elapsed_ms: i64,
+    pub is_active: bool,
+    pub is_hovered: bool,
+}
+
+pub struct TransitionManager {
+    pub states: Vec<TransitionState>,
+}
+
+impl TransitionManager {
+    pub fn new() -> TransitionManager {
+        return TransitionManager {
+            states: Vec::<TransitionState>::new(),
+        };
+    }
+
+    pub fn set_hover(&mut self, id: string, is_hover: bool, normal_col: Color, hover_col: Color, duration_ms: i64) {
+        let dur = if duration_ms > 0 { duration_ms } else { 150 };
+        let mut found = false;
+        let mut i: usize = 0;
+        while i < self.states.len() {
+            if self.states[i].id == id {
+                found = true;
+                if self.states[i].is_hovered != is_hover {
+                    self.states[i].is_hovered = is_hover;
+                    let target = if is_hover { hover_col.clone() } else { normal_col.clone() };
+                    self.states[i].target_r = target.r;
+                    self.states[i].target_g = target.g;
+                    self.states[i].target_b = target.b;
+                    self.states[i].target_a = target.a;
+                    self.states[i].elapsed_ms = 0;
+                    self.states[i].duration_ms = dur;
+                    self.states[i].is_active = true;
+                }
+                break;
+            }
+            i += 1;
+        }
+
+        if !found {
+            let target = if is_hover { hover_col.clone() } else { normal_col.clone() };
+            let init_c = if is_hover { normal_col.clone() } else { hover_col.clone() };
+            self.states.push(TransitionState {
+                id,
+                current_r: init_c.r,
+                current_g: init_c.g,
+                current_b: init_c.b,
+                current_a: init_c.a,
+                target_r: target.r,
+                target_g: target.g,
+                target_b: target.b,
+                target_a: target.a,
+                duration_ms: dur,
+                elapsed_ms: 0,
+                is_active: true,
+                is_hovered: is_hover,
+            });
+        }
+    }
+
+    pub fn step(&mut self, dt_ms: i64) -> bool {
+        let mut any_animating = false;
+        let mut i: usize = 0;
+        while i < self.states.len() {
+            if self.states[i].is_active {
+                self.states[i].elapsed_ms += dt_ms;
+                let dur = if self.states[i].duration_ms > 0 { self.states[i].duration_ms } else { 1 };
+                let p = (self.states[i].elapsed_ms * 1000) / dur;
+                if p >= 1000 {
+                    self.states[i].current_r = self.states[i].target_r;
+                    self.states[i].current_g = self.states[i].target_g;
+                    self.states[i].current_b = self.states[i].target_b;
+                    self.states[i].current_a = self.states[i].target_a;
+                    self.states[i].is_active = false;
+                } else {
+                    let cur_c = Color::rgba(self.states[i].current_r, self.states[i].current_g, self.states[i].current_b, self.states[i].current_a);
+                    let tgt_c = Color::rgba(self.states[i].target_r, self.states[i].target_g, self.states[i].target_b, self.states[i].target_a);
+                    let lerped = tw_lerp_color(cur_c, tgt_c, p);
+                    self.states[i].current_r = lerped.r;
+                    self.states[i].current_g = lerped.g;
+                    self.states[i].current_b = lerped.b;
+                    self.states[i].current_a = lerped.a;
+                    any_animating = true;
+                }
+            }
+            i += 1;
+        }
+        return any_animating;
+    }
+
+    pub fn get_current_color(&self, id: string, default_col: Color) -> Color {
+        let mut i: usize = 0;
+        while i < self.states.len() {
+            if self.states[i].id == id {
+                return Color::rgba(self.states[i].current_r, self.states[i].current_g, self.states[i].current_b, self.states[i].current_a);
+            }
+            i += 1;
+        }
+        return default_col;
     }
 }
 
@@ -870,7 +1137,1378 @@ pub fn ui_m3_tab_pill(id: string, label: string, is_active: bool, on_click_id: s
 }
 
 // ==========================================
-// 5. Virtualized ListView Layout Engine
+// 5. Flutter + Tailwind Unified Styling Engine (Comprehensive Edition)
+// ==========================================
+
+fn ui_str_slice(s: string, start: usize, end: usize) -> string {
+    let s_chars: Vec<char> = s.chars();
+    let mut sb = StringBuilder::new();
+    let mut i = start;
+    let limit = if end > s_chars.len() { s_chars.len() } else { end };
+    while i < limit {
+        sb.append(s_chars[i].to_string());
+        i += 1;
+    }
+    return sb.to_string();
+}
+
+fn ui_parse_int(s: string) -> i64 {
+    let chars: Vec<char> = s.chars();
+    let mut res: i64 = 0;
+    let mut i: usize = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c >= '0' && c <= '9' {
+            let digit = (c as i64) - ('0' as i64);
+            res = (res * 10) + digit;
+        }
+        i += 1;
+    }
+    return res;
+}
+
+pub fn tw_parse_color_base(name: string) -> Color {
+    if name == "transparent" {
+        return Color::transparent();
+    } else if name == "white" {
+        return Color::white();
+    } else if name == "black" {
+        return Color::rgb(0, 0, 0);
+    }
+    // Slate
+    else if name == "slate-50" { return Color::from_hex("#F8FAFC".to_string()); }
+    else if name == "slate-100" { return Color::from_hex("#F1F5F9".to_string()); }
+    else if name == "slate-200" { return Color::from_hex("#E2E8F0".to_string()); }
+    else if name == "slate-300" { return Color::from_hex("#CBD5E1".to_string()); }
+    else if name == "slate-400" { return Color::from_hex("#94A3B8".to_string()); }
+    else if name == "slate-500" { return Color::from_hex("#64748B".to_string()); }
+    else if name == "slate-600" { return Color::from_hex("#475569".to_string()); }
+    else if name == "slate-700" { return Color::from_hex("#334155".to_string()); }
+    else if name == "slate-750" { return Color::from_hex("#1B2232".to_string()); }
+    else if name == "slate-800" { return Color::from_hex("#1E293B".to_string()); }
+    else if name == "slate-850" { return Color::from_hex("#111622".to_string()); }
+    else if name == "slate-900" { return Color::from_hex("#0D111A".to_string()); }
+    else if name == "slate-950" { return Color::from_hex("#090C15".to_string()); }
+    // Zinc
+    else if name == "zinc-50" { return Color::from_hex("#FAFAFA".to_string()); }
+    else if name == "zinc-100" { return Color::from_hex("#F4F4F5".to_string()); }
+    else if name == "zinc-200" { return Color::from_hex("#E4E4E7".to_string()); }
+    else if name == "zinc-300" { return Color::from_hex("#D4D4D8".to_string()); }
+    else if name == "zinc-400" { return Color::from_hex("#A1A1AA".to_string()); }
+    else if name == "zinc-500" { return Color::from_hex("#71717A".to_string()); }
+    else if name == "zinc-600" { return Color::from_hex("#52525B".to_string()); }
+    else if name == "zinc-700" { return Color::from_hex("#3F3F46".to_string()); }
+    else if name == "zinc-800" { return Color::from_hex("#27272A".to_string()); }
+    else if name == "zinc-900" { return Color::from_hex("#18181B".to_string()); }
+    else if name == "zinc-950" { return Color::from_hex("#09090B".to_string()); }
+    // Indigo
+    else if name == "indigo-50" { return Color::from_hex("#EEF2FF".to_string()); }
+    else if name == "indigo-100" { return Color::from_hex("#E0E7FF".to_string()); }
+    else if name == "indigo-200" { return Color::from_hex("#C7D2FE".to_string()); }
+    else if name == "indigo-300" { return Color::from_hex("#A5B4FC".to_string()); }
+    else if name == "indigo-400" { return Color::from_hex("#818CF8".to_string()); }
+    else if name == "indigo-500" { return Color::from_hex("#6366F1".to_string()); }
+    else if name == "indigo-600" { return Color::from_hex("#4F46E5".to_string()); }
+    else if name == "indigo-700" { return Color::from_hex("#4338CA".to_string()); }
+    else if name == "indigo-800" { return Color::from_hex("#3730A3".to_string()); }
+    else if name == "indigo-900" { return Color::from_hex("#312E81".to_string()); }
+    else if name == "indigo-950" { return Color::from_hex("#1E1B4B".to_string()); }
+    // Emerald / Green
+    else if name == "emerald-400" { return Color::from_hex("#34D399".to_string()); }
+    else if name == "emerald-500" { return Color::from_hex("#10B981".to_string()); }
+    else if name == "emerald-600" { return Color::from_hex("#059669".to_string()); }
+    else if name == "emerald-950" { return Color::from_hex("#022C22".to_string()); }
+    else if name == "green-500" { return Color::from_hex("#22C55E".to_string()); }
+    // Rose / Red
+    else if name == "rose-400" { return Color::from_hex("#FB7185".to_string()); }
+    else if name == "rose-500" { return Color::from_hex("#F43F5E".to_string()); }
+    else if name == "rose-600" { return Color::from_hex("#E11D48".to_string()); }
+    else if name == "red-500" { return Color::from_hex("#EF4444".to_string()); }
+    // Amber / Orange
+    else if name == "amber-400" { return Color::from_hex("#FBBF24".to_string()); }
+    else if name == "amber-500" { return Color::from_hex("#F59E0B".to_string()); }
+    else if name == "orange-500" { return Color::from_hex("#F97316".to_string()); }
+    // Sky / Cyan / Blue
+    else if name == "sky-400" { return Color::from_hex("#38BDF8".to_string()); }
+    else if name == "sky-500" { return Color::from_hex("#0EA5E9".to_string()); }
+    else if name == "cyan-500" { return Color::from_hex("#06B6D4".to_string()); }
+    else if name == "blue-500" { return Color::from_hex("#3B82F6".to_string()); }
+    else if name == "blue-600" { return Color::from_hex("#2563EB".to_string()); }
+    // Violet / Purple / Pink
+    else if name == "violet-500" { return Color::from_hex("#8B5CF6".to_string()); }
+    else if name == "purple-500" { return Color::from_hex("#A855F7".to_string()); }
+    else if name == "fuchsia-500" { return Color::from_hex("#D946EF".to_string()); }
+    else if name == "pink-500" { return Color::from_hex("#EC4899".to_string()); }
+    // Arbitrary hex: [#123456]
+    else if name.starts_with("[#") && name.ends_with("]") {
+        let hex_val = ui_str_slice(name.clone(), 1, name.len() - 1);
+        return Color::from_hex(hex_val);
+    }
+    return Color::transparent();
+}
+
+// Universal Opacity Modifier Resolver (e.g. bg-indigo-600/50, white/10)
+pub fn tw_parse_color(name: string) -> Color {
+    if name.contains("/") {
+        let parts: Vec<string> = name.split("/");
+        if parts.len() >= 2 {
+            let base_name = parts[0].clone();
+            let pct = ui_parse_int(parts[1].clone());
+            let alpha = if pct > 100 { 255 } else { (pct * 255) / 100 };
+            let base_col = tw_parse_color_base(base_name);
+            return base_col.with_alpha(alpha);
+        }
+    }
+    return tw_parse_color_base(name);
+}
+
+pub struct StyleSpec {
+    pub width: i64,             // -1 = unset, -2 = full (100%), -50 = 50%, -33 = 33%, etc.
+    pub height: i64,            // -1 = unset, -2 = full
+    pub min_width: i64,
+    pub max_width: i64,
+    pub bg_color: Color,
+    pub border_color: Color,
+    pub border_width: i64,
+    pub radius: i64,
+    pub shadow_blur: i64,
+    pub shadow_y: i64,
+    pub shadow_color: Color,
+    pub pad_top: i64,
+    pub pad_bottom: i64,
+    pub pad_left: i64,
+    pub pad_right: i64,
+    pub mar_top: i64,
+    pub mar_bottom: i64,
+    pub mar_left: i64,
+    pub mar_right: i64,
+    pub gap: i64,
+    pub text_size: i64,
+    pub text_color: Color,
+    pub is_bold: bool,
+    pub is_center_text: bool,
+    pub is_row: bool,
+    pub is_col: bool,
+    pub is_grid: bool,
+    pub grid_cols: i64,
+    pub is_center: bool,
+    pub is_between: bool,
+    pub is_cursor_pointer: bool,
+    pub has_hover: bool,
+    pub hover_bg: Color,
+    pub hover_border: Color,
+    pub hover_text: Color,
+    pub has_transition: bool,
+    pub transition_duration_ms: i64,
+}
+
+impl StyleSpec {
+    pub fn default() -> StyleSpec {
+        return StyleSpec {
+            width: -1,
+            height: -1,
+            min_width: 0,
+            max_width: 99999,
+            bg_color: Color::transparent(),
+            border_color: Color::transparent(),
+            border_width: 0,
+            radius: 0,
+            shadow_blur: 0,
+            shadow_y: 0,
+            shadow_color: Color::transparent(),
+            pad_top: 0,
+            pad_bottom: 0,
+            pad_left: 0,
+            pad_right: 0,
+            mar_top: 0,
+            mar_bottom: 0,
+            mar_left: 0,
+            mar_right: 0,
+            gap: 0,
+            text_size: 14,
+            text_color: Color::white(),
+            is_bold: false,
+            is_center_text: false,
+            is_row: false,
+            is_col: false,
+            is_grid: false,
+            grid_cols: 1,
+            is_center: false,
+            is_between: false,
+            is_cursor_pointer: false,
+            has_hover: false,
+            hover_bg: Color::transparent(),
+            hover_border: Color::transparent(),
+            hover_text: Color::white(),
+            has_transition: false,
+            transition_duration_ms: 150,
+        };
+    }
+}
+
+pub fn tw_apply_token(in_spec: StyleSpec, token: string) -> StyleSpec {
+    let mut spec = in_spec;
+    if token.starts_with("hover:") {
+        let sub = ui_str_slice(token.clone(), 6, token.len());
+        if sub.starts_with("bg-") {
+            let col_name = ui_str_slice(sub.clone(), 3, sub.len());
+            spec.hover_bg = tw_parse_color(col_name);
+            spec.has_hover = true;
+        } else if sub.starts_with("border-") {
+            let col_name = ui_str_slice(sub.clone(), 7, sub.len());
+            spec.hover_border = tw_parse_color(col_name);
+            spec.has_hover = true;
+        } else if sub.starts_with("text-") {
+            let col_name = ui_str_slice(sub.clone(), 5, sub.len());
+            spec.hover_text = tw_parse_color(col_name);
+            spec.has_hover = true;
+        }
+    } else if token.starts_with("bg-") {
+        let col_name = ui_str_slice(token.clone(), 3, token.len());
+        spec.bg_color = tw_parse_color(col_name);
+    } else if token.starts_with("text-") {
+        if token == "text-xs" {
+            spec.text_size = 10;
+        } else if token == "text-sm" {
+            spec.text_size = 12;
+        } else if token == "text-base" {
+            spec.text_size = 14;
+        } else if token == "text-lg" {
+            spec.text_size = 16;
+        } else if token == "text-xl" {
+            spec.text_size = 18;
+        } else if token == "text-2xl" {
+            spec.text_size = 24;
+        } else if token == "text-3xl" {
+            spec.text_size = 30;
+        } else if token == "text-4xl" {
+            spec.text_size = 36;
+        } else if token == "text-center" {
+            spec.is_center_text = true;
+        } else {
+            let col_name = ui_str_slice(token.clone(), 5, token.len());
+            let col = tw_parse_color(col_name);
+            if col.a > 0 {
+                spec.text_color = col;
+            }
+        }
+    } else if token.starts_with("border") {
+        if token == "border" {
+            spec.border_width = 1;
+            spec.border_color = Color::rgba(255, 255, 255, 25);
+        } else if token == "border-0" {
+            spec.border_width = 0;
+            spec.border_color = Color::transparent();
+        } else if token == "border-2" {
+            spec.border_width = 2;
+        } else if token == "border-4" {
+            spec.border_width = 4;
+        } else if token.starts_with("border-") {
+            let col_name = ui_str_slice(token.clone(), 7, token.len());
+            spec.border_color = tw_parse_color(col_name);
+            if spec.border_width == 0 {
+                spec.border_width = 1;
+            }
+        }
+    } else if token.starts_with("rounded") {
+        if token == "rounded-none" {
+            spec.radius = 0;
+        } else if token == "rounded-sm" {
+            spec.radius = 4;
+        } else if token == "rounded" || token == "rounded-md" {
+            spec.radius = 8;
+        } else if token == "rounded-lg" {
+            spec.radius = 10;
+        } else if token == "rounded-xl" {
+            spec.radius = 14;
+        } else if token == "rounded-2xl" {
+            spec.radius = 18;
+        } else if token == "rounded-3xl" {
+            spec.radius = 24;
+        } else if token == "rounded-full" {
+            spec.radius = 9999;
+        }
+    } else if token.starts_with("shadow") {
+        if token == "shadow-none" {
+            spec.shadow_blur = 0;
+        } else if token == "shadow-sm" {
+            spec.shadow_blur = 4;
+            spec.shadow_y = 1;
+            spec.shadow_color = Color::rgba(0, 0, 0, 40);
+        } else if token == "shadow" || token == "shadow-md" {
+            spec.shadow_blur = 6;
+            spec.shadow_y = 2;
+            spec.shadow_color = Color::rgba(0, 0, 0, 60);
+        } else if token == "shadow-lg" {
+            spec.shadow_blur = 14;
+            spec.shadow_y = 4;
+            spec.shadow_color = Color::rgba(0, 0, 0, 80);
+        } else if token == "shadow-xl" {
+            spec.shadow_blur = 20;
+            spec.shadow_y = 6;
+            spec.shadow_color = Color::rgba(0, 0, 0, 100);
+        }
+    } else if token.starts_with("w-") {
+        let val_str = ui_str_slice(token.clone(), 2, token.len());
+        if val_str == "full" {
+            spec.width = -2;
+        } else if val_str == "auto" {
+            spec.width = -1;
+        } else if val_str == "1/2" {
+            spec.width = -50;
+        } else if val_str == "1/3" {
+            spec.width = -33;
+        } else if val_str == "2/3" {
+            spec.width = -66;
+        } else if val_str == "1/4" {
+            spec.width = -25;
+        } else if val_str == "3/4" {
+            spec.width = -75;
+        } else if val_str.starts_with("[") && val_str.ends_with("]") {
+            let inner = ui_str_slice(val_str, 1, val_str.len() - 1);
+            spec.width = ui_parse_int(inner);
+        } else {
+            let num = ui_parse_int(val_str);
+            spec.width = if num <= 24 { num * 4 } else { num };
+        }
+    } else if token.starts_with("h-") {
+        let val_str = ui_str_slice(token.clone(), 2, token.len());
+        if val_str == "full" {
+            spec.height = -2;
+        } else if val_str == "auto" {
+            spec.height = -1;
+        } else if val_str == "1/2" {
+            spec.height = -50;
+        } else if val_str.starts_with("[") && val_str.ends_with("]") {
+            let inner = ui_str_slice(val_str, 1, val_str.len() - 1);
+            spec.height = ui_parse_int(inner);
+        } else {
+            let num = ui_parse_int(val_str);
+            spec.height = if num <= 24 { num * 4 } else { num };
+        }
+    }
+    // Padding
+    else if token.starts_with("p-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 2, token.len()));
+        let px = num * 4;
+        spec.pad_top = px; spec.pad_bottom = px; spec.pad_left = px; spec.pad_right = px;
+    } else if token.starts_with("px-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 3, token.len()));
+        let px = num * 4;
+        spec.pad_left = px; spec.pad_right = px;
+    } else if token.starts_with("py-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 3, token.len()));
+        let px = num * 4;
+        spec.pad_top = px; spec.pad_bottom = px;
+    } else if token.starts_with("pt-") {
+        spec.pad_top = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    } else if token.starts_with("pb-") {
+        spec.pad_bottom = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    } else if token.starts_with("pl-") {
+        spec.pad_left = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    } else if token.starts_with("pr-") {
+        spec.pad_right = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    }
+    // Margin
+    else if token.starts_with("m-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 2, token.len()));
+        let mx = num * 4;
+        spec.mar_top = mx; spec.mar_bottom = mx; spec.mar_left = mx; spec.mar_right = mx;
+    } else if token.starts_with("mx-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 3, token.len()));
+        let mx = num * 4;
+        spec.mar_left = mx; spec.mar_right = mx;
+    } else if token.starts_with("my-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 3, token.len()));
+        let mx = num * 4;
+        spec.mar_top = mx; spec.mar_bottom = mx;
+    } else if token.starts_with("mt-") {
+        spec.mar_top = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    } else if token.starts_with("mb-") {
+        spec.mar_bottom = ui_parse_int(ui_str_slice(token.clone(), 3, token.len())) * 4;
+    }
+    // Gap
+    else if token.starts_with("gap-") {
+        let num = ui_parse_int(ui_str_slice(token.clone(), 4, token.len()));
+        spec.gap = num * 4;
+    }
+    // Grid
+    else if token == "grid" {
+        spec.is_grid = true;
+    } else if token.starts_with("grid-cols-") {
+        spec.is_grid = true;
+        spec.grid_cols = ui_parse_int(ui_str_slice(token.clone(), 10, token.len()));
+    }
+    // Typography weights
+    else if token == "font-bold" {
+        spec.is_bold = true;
+    } else if token == "font-semibold" || token == "font-medium" {
+        spec.is_bold = true;
+    } else if token == "font-normal" {
+        spec.is_bold = false;
+    }
+    // Flex / Alignment
+    else if token == "flex-row" {
+        spec.is_row = true;
+    } else if token == "flex-col" {
+        spec.is_col = true;
+    } else if token == "items-center" {
+        spec.is_center = true;
+    } else if token == "justify-between" {
+        spec.is_between = true;
+    } else if token == "cursor-pointer" {
+        spec.is_cursor_pointer = true;
+    } else if token == "transition" || token == "transition-all" || token == "transition-colors" {
+        spec.has_transition = true;
+        if spec.transition_duration_ms == 0 {
+            spec.transition_duration_ms = 150;
+        }
+    } else if token.starts_with("duration-") {
+        let ms_str = ui_str_slice(token.clone(), 9, token.len());
+        spec.transition_duration_ms = ui_parse_int(ms_str);
+        spec.has_transition = true;
+    }
+    return spec;
+}
+
+pub fn tw_parse_responsive_style(classes: string, window_w: i64) -> StyleSpec {
+    let mut spec = StyleSpec::default();
+    let tokens: Vec<string> = classes.split(" ");
+    let mut i: usize = 0;
+    while i < tokens.len() {
+        let token = tokens[i].trim();
+        if token.len() == 0 {
+            i += 1;
+            continue;
+        }
+
+        if token.starts_with("sm:") {
+            if window_w >= 640 {
+                let sub = ui_str_slice(token.clone(), 3, token.len());
+                spec = tw_apply_token(spec, sub);
+            }
+        } else if token.starts_with("md:") {
+            if window_w >= 768 {
+                let sub = ui_str_slice(token.clone(), 3, token.len());
+                spec = tw_apply_token(spec, sub);
+            }
+        } else if token.starts_with("lg:") {
+            if window_w >= 1024 {
+                let sub = ui_str_slice(token.clone(), 3, token.len());
+                spec = tw_apply_token(spec, sub);
+            }
+        } else if token.starts_with("xl:") {
+            if window_w >= 1280 {
+                let sub = ui_str_slice(token.clone(), 3, token.len());
+                spec = tw_apply_token(spec, sub);
+            }
+        } else {
+            spec = tw_apply_token(spec, token);
+        }
+
+        i += 1;
+    }
+    return spec;
+}
+
+pub fn tw_parse_style(classes: string) -> StyleSpec {
+    return tw_parse_responsive_style(classes, 1080);
+}
+
+pub fn tw_apply_style(node: ElementNode, spec: StyleSpec) -> ElementNode {
+    let mut res = node;
+    if spec.width > 0 {
+        res.bounds.width = spec.width;
+    }
+    if spec.height > 0 {
+        res.bounds.height = spec.height;
+    }
+    res.color = spec.bg_color;
+    res.border_color = spec.border_color;
+    res.radius = BorderRadius::all(spec.radius);
+    if spec.shadow_blur > 0 {
+        res.shadow = Shadow::new(0, spec.shadow_y, spec.shadow_blur, spec.shadow_color);
+    }
+    return res;
+}
+
+// 1. Text Component
+pub fn tw_text(id: string, text: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let mut node = ElementNode::new("text".to_string(), id);
+    node.text = text;
+    node.font_size = spec.text_size;
+    node.color = spec.text_color;
+    node.is_bold = spec.is_bold;
+
+    let text_len = node.text.len() as i64;
+    let approx_width = (text_len * spec.text_size * 6) / 10;
+    node.bounds = Rect::new(0, 0, approx_width, spec.text_size + 4);
+    return node;
+}
+
+// 2. Container / Box Component
+pub fn tw_box(id: string, style: string, child: ElementNode) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("container".to_string(), id);
+    let mut node = tw_apply_style(raw, spec.clone());
+
+    let mut positioned_child = child.clone();
+    let cx = if spec.is_center && node.bounds.width > child.bounds.width {
+        (node.bounds.width - child.bounds.width) / 2
+    } else {
+        spec.pad_left
+    };
+    let cy = if spec.is_center && node.bounds.height > child.bounds.height {
+        (node.bounds.height - child.bounds.height) / 2
+    } else {
+        spec.pad_top
+    };
+    positioned_child.bounds.x = cx;
+    positioned_child.bounds.y = cy;
+
+    if node.bounds.width <= 0 {
+        node.bounds.width = child.bounds.width + spec.pad_left + spec.pad_right;
+    }
+    if node.bounds.height <= 0 {
+        node.bounds.height = child.bounds.height + spec.pad_top + spec.pad_bottom;
+    }
+
+    node.add_child(positioned_child);
+    return node;
+}
+
+// 3. Row (Flex Row) Component
+pub fn tw_row(id: string, style: string, children: Vec<ElementNode>) -> ElementNode {
+    let mut spec = tw_parse_style(style);
+    spec.is_row = true;
+    let raw = ElementNode::new("row".to_string(), id);
+    let mut row_node = tw_apply_style(raw, spec.clone());
+
+    let mut cur_x = spec.pad_left;
+    let mut max_h: i64 = 0;
+    let mut i: usize = 0;
+
+    while i < children.len() {
+        if children[i].bounds.height > max_h {
+            max_h = children[i].bounds.height;
+        }
+        i += 1;
+    }
+
+    let target_h = if row_node.bounds.height > 0 { row_node.bounds.height } else { max_h + spec.pad_top + spec.pad_bottom };
+
+    i = 0;
+    while i < children.len() {
+        let mut child = children[i].clone();
+        child.bounds.x = cur_x;
+        if spec.is_center {
+            child.bounds.y = (target_h - child.bounds.height) / 2;
+        } else {
+            child.bounds.y = spec.pad_top;
+        }
+        cur_x += child.bounds.width + spec.gap;
+        row_node.add_child(child);
+        i += 1;
+    }
+
+    if row_node.bounds.width <= 0 {
+        row_node.bounds.width = if children.len() > 0 { cur_x - spec.gap + spec.pad_right } else { spec.pad_left + spec.pad_right };
+    }
+    if row_node.bounds.height <= 0 {
+        row_node.bounds.height = target_h;
+    }
+
+    return row_node;
+}
+
+// 4. Column (Flex Column) Component
+pub fn tw_col(id: string, style: string, children: Vec<ElementNode>) -> ElementNode {
+    let mut spec = tw_parse_style(style);
+    spec.is_col = true;
+    let raw = ElementNode::new("column".to_string(), id);
+    let mut col_node = tw_apply_style(raw, spec.clone());
+
+    let mut cur_y = spec.pad_top;
+    let mut max_w: i64 = 0;
+    let mut i: usize = 0;
+
+    while i < children.len() {
+        if children[i].bounds.width > max_w {
+            max_w = children[i].bounds.width;
+        }
+        i += 1;
+    }
+
+    let target_w = if col_node.bounds.width > 0 { col_node.bounds.width } else { max_w + spec.pad_left + spec.pad_right };
+
+    i = 0;
+    while i < children.len() {
+        let mut child = children[i].clone();
+        child.bounds.y = cur_y;
+        if spec.is_center {
+            child.bounds.x = (target_w - child.bounds.width) / 2;
+        } else {
+            child.bounds.x = spec.pad_left;
+        }
+        cur_y += child.bounds.height + spec.gap;
+        col_node.add_child(child);
+        i += 1;
+    }
+
+    if col_node.bounds.height <= 0 {
+        col_node.bounds.height = if children.len() > 0 { cur_y - spec.gap + spec.pad_bottom } else { spec.pad_top + spec.pad_bottom };
+    }
+    if col_node.bounds.width <= 0 {
+        col_node.bounds.width = target_w;
+    }
+
+    return col_node;
+}
+
+// 5. CSS Grid Component
+pub fn tw_grid(id: string, style: string, cols: i64, children: Vec<ElementNode>) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("grid".to_string(), id);
+    let mut grid_node = tw_apply_style(raw, spec.clone());
+
+    let actual_cols = if cols > 0 { cols } else { 1 };
+    let total_w = if grid_node.bounds.width > 0 { grid_node.bounds.width } else { 600 };
+    let gap_total = (actual_cols - 1) * spec.gap;
+    let col_w = (total_w - spec.pad_left - spec.pad_right - gap_total) / actual_cols;
+
+    let mut row_max_h: i64 = 0;
+    let mut cur_x = spec.pad_left;
+    let mut cur_y = spec.pad_top;
+
+    let mut i: usize = 0;
+    while i < children.len() {
+        let col_idx = (i as i64) % actual_cols;
+        if col_idx == 0 && i > 0 {
+            cur_y += row_max_h + spec.gap;
+            cur_x = spec.pad_left;
+            row_max_h = 0;
+        }
+
+        let mut child = children[i].clone();
+        child.bounds.x = cur_x;
+        child.bounds.y = cur_y;
+        if child.bounds.width <= 0 || child.bounds.width > col_w {
+            child.bounds.width = col_w;
+        }
+        if child.bounds.height > row_max_h {
+            row_max_h = child.bounds.height;
+        }
+
+        cur_x += col_w + spec.gap;
+        grid_node.add_child(child);
+        i += 1;
+    }
+
+    if grid_node.bounds.height <= 0 {
+        grid_node.bounds.height = cur_y + row_max_h + spec.pad_bottom;
+    }
+    if grid_node.bounds.width <= 0 {
+        grid_node.bounds.width = total_w;
+    }
+
+    return grid_node;
+}
+
+// 6. Stack Component (Layered / Absolute Overlay)
+pub fn tw_stack(id: string, style: string, children: Vec<ElementNode>) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("stack".to_string(), id);
+    let mut stack_node = tw_apply_style(raw, spec.clone());
+
+    let mut max_w: i64 = 0;
+    let mut max_h: i64 = 0;
+
+    let mut i: usize = 0;
+    while i < children.len() {
+        let child = children[i].clone();
+        if child.bounds.width > max_w { max_w = child.bounds.width; }
+        if child.bounds.height > max_h { max_h = child.bounds.height; }
+        stack_node.add_child(child);
+        i += 1;
+    }
+
+    if stack_node.bounds.width <= 0 { stack_node.bounds.width = max_w; }
+    if stack_node.bounds.height <= 0 { stack_node.bounds.height = max_h; }
+
+    return stack_node;
+}
+
+// 7. Button Component
+pub fn tw_btn(id: string, label: string, on_click_id: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("button".to_string(), id.clone());
+    let mut btn = tw_apply_style(raw, spec.clone());
+    btn.on_click_id = on_click_id;
+
+    let size_class = if spec.text_size <= 12 { "text-sm".to_string() } else { "text-base".to_string() };
+    let weight_class = if spec.is_bold { "font-bold".to_string() } else { "font-semibold".to_string() };
+    let txt = tw_text(f"{id}_lbl", label, f"{size_class} {weight_class} text-white");
+
+    let bw = if btn.bounds.width > 0 { btn.bounds.width } else { txt.bounds.width + spec.pad_left + spec.pad_right + 24 };
+    let bh = if btn.bounds.height > 0 { btn.bounds.height } else { 38 };
+    btn.bounds = Rect::new(0, 0, bw, bh);
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = (bw - txt.bounds.width) / 2;
+    pos_txt.bounds.y = (bh - txt.bounds.height) / 2;
+    btn.add_child(pos_txt);
+    return btn;
+}
+
+// 8. Avatar Component
+pub fn tw_avatar(id: string, initial: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("avatar".to_string(), id.clone());
+    let mut av = tw_apply_style(raw, spec.clone());
+    if av.bounds.width <= 0 { av.bounds.width = 34; }
+    if av.bounds.height <= 0 { av.bounds.height = 34; }
+    if av.radius.top_left == 0 { av.radius = BorderRadius::all(av.bounds.width / 2); }
+
+    let txt = tw_text(f"{id}_t", initial, "text-sm text-white font-bold");
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = (av.bounds.width - txt.bounds.width) / 2;
+    pos_txt.bounds.y = (av.bounds.height - txt.bounds.height) / 2;
+    av.add_child(pos_txt);
+    return av;
+}
+
+// 9. Badge Component
+pub fn tw_badge(id: string, label: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("badge".to_string(), id.clone());
+    let mut badge = tw_apply_style(raw, spec.clone());
+
+    let txt = tw_text(f"{id}_t", label, "text-xs font-bold text-white");
+    let bw = if badge.bounds.width > 0 { badge.bounds.width } else { txt.bounds.width + spec.pad_left + spec.pad_right + 14 };
+    let bh = if badge.bounds.height > 0 { badge.bounds.height } else { 22 };
+    badge.bounds = Rect::new(0, 0, bw, bh);
+    if badge.radius.top_left == 0 { badge.radius = BorderRadius::all(bh / 2); }
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = (bw - txt.bounds.width) / 2;
+    pos_txt.bounds.y = (bh - txt.bounds.height) / 2;
+    badge.add_child(pos_txt);
+    return badge;
+}
+
+// 10. Chip Component
+pub fn tw_chip(id: string, label: string, is_active: bool, on_click_id: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("chip".to_string(), id.clone());
+    let mut chip = tw_apply_style(raw, spec.clone());
+    chip.on_click_id = on_click_id;
+
+    let txt = tw_text(f"{id}_txt", label, "text-xs font-semibold text-slate-200");
+    let cw = if chip.bounds.width > 0 { chip.bounds.width } else { txt.bounds.width + 24 };
+    let ch = if chip.bounds.height > 0 { chip.bounds.height } else { 28 };
+    chip.bounds = Rect::new(0, 0, cw, ch);
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = (cw - txt.bounds.width) / 2;
+    pos_txt.bounds.y = (ch - txt.bounds.height) / 2;
+    chip.add_child(pos_txt);
+    return chip;
+}
+
+// 11. Divider Component
+pub fn tw_divider(id: string, style: string) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("divider".to_string(), id);
+    let mut d = tw_apply_style(raw, spec.clone());
+    if d.bounds.height <= 0 { d.bounds.height = 1; }
+    if d.bounds.width <= 0 { d.bounds.width = 100; }
+    if d.color.a == 0 { d.color = Color::rgba(255, 255, 255, 25); }
+    return d;
+}
+
+// 12. Card Component
+pub fn tw_card(id: string, style: string, child: ElementNode) -> ElementNode {
+    return tw_box(id, f"p-4 rounded-xl border border-white/10 shadow-md bg-slate-900 {style}", child);
+}
+
+// 13. Reactive State Widgets
+pub fn tw_reactive_text(id: string, store: ReactiveStore, key: string, style: string) -> ElementNode {
+    let text = store.get_str(key);
+    return tw_text(id, text, style);
+}
+
+pub fn tw_reactive_box(id: string, store: ReactiveStore, visible_key: string, style: string, child: ElementNode) -> ElementNode {
+    let is_vis = store.get_bool(visible_key);
+    if !is_vis {
+        return ElementNode::new("empty".to_string(), id);
+    }
+    return tw_box(id, style, child);
+}
+
+// 14. Multi-line Rich Text Input Component
+pub struct TextAreaModel {
+    pub lines: Vec<string>,
+    pub cursor_row: i64,
+    pub cursor_col: i64,
+    pub sel_start_row: i64,
+    pub sel_start_col: i64,
+    pub sel_end_row: i64,
+    pub sel_end_col: i64,
+    pub has_selection: bool,
+    pub scroll_y: i64,
+    pub line_height: i64,
+    pub font_size: i64,
+    pub show_line_numbers: bool,
+}
+
+impl TextAreaModel {
+    pub fn new(initial_text: string) -> TextAreaModel {
+        let mut model = TextAreaModel {
+            lines: Vec::<string>::new(),
+            cursor_row: 0,
+            cursor_col: 0,
+            sel_start_row: 0,
+            sel_start_col: 0,
+            sel_end_row: 0,
+            sel_end_col: 0,
+            has_selection: false,
+            scroll_y: 0,
+            line_height: 22,
+            font_size: 13,
+            show_line_numbers: true,
+        };
+        model.set_text(initial_text);
+        return model;
+    }
+
+    pub fn set_text(&mut self, text: string) {
+        self.lines = Vec::<string>::new();
+        if text.len() == 0 {
+            self.lines.push("".to_string());
+            self.cursor_row = 0;
+            self.cursor_col = 0;
+            return;
+        }
+        let raw_lines: Vec<string> = text.split("\n");
+        let mut i: usize = 0;
+        while i < raw_lines.len() {
+            let mut line = raw_lines[i].clone();
+            if line.ends_with("\r") {
+                line = ui_str_slice(line.clone(), 0, line.len() - 1);
+            }
+            self.lines.push(line);
+            i += 1;
+        }
+        if self.lines.len() == 0 {
+            self.lines.push("".to_string());
+        }
+        self.cursor_row = (self.lines.len() as i64) - 1;
+        self.cursor_col = self.lines[self.lines.len() - 1].len() as i64;
+    }
+
+    pub fn get_text(&self) -> string {
+        let mut sb = StringBuilder::new();
+        let mut i: usize = 0;
+        while i < self.lines.len() {
+            sb.append(self.lines[i].clone());
+            if i + 1 < self.lines.len() {
+                sb.append("\n".to_string());
+            }
+            i += 1;
+        }
+        return sb.to_string();
+    }
+
+    pub fn insert_char(&mut self, ch: string) {
+        if self.has_selection {
+            self.delete_selection();
+        }
+        let row = self.cursor_row as usize;
+        if row >= self.lines.len() {
+            return;
+        }
+        let cur_line = self.lines[row].clone();
+        let col = if self.cursor_col as usize > cur_line.len() { cur_line.len() } else { self.cursor_col as usize };
+        let left = ui_str_slice(cur_line.clone(), 0, col);
+        let right = ui_str_slice(cur_line.clone(), col, cur_line.len());
+        self.lines[row] = f"{left}{ch}{right}";
+        self.cursor_col += ch.len() as i64;
+    }
+
+    pub fn insert_newline(&mut self) {
+        if self.has_selection {
+            self.delete_selection();
+        }
+        let row = self.cursor_row as usize;
+        if row >= self.lines.len() {
+            return;
+        }
+        let cur_line = self.lines[row].clone();
+        let col = if self.cursor_col as usize > cur_line.len() { cur_line.len() } else { self.cursor_col as usize };
+        let left = ui_str_slice(cur_line.clone(), 0, col);
+        let right = ui_str_slice(cur_line.clone(), col, cur_line.len());
+
+        self.lines[row] = left;
+        let mut new_lines = Vec::<string>::new();
+        let mut i: usize = 0;
+        while i <= row {
+            new_lines.push(self.lines[i].clone());
+            i += 1;
+        }
+        new_lines.push(right);
+        while i < self.lines.len() {
+            new_lines.push(self.lines[i].clone());
+            i += 1;
+        }
+        self.lines = new_lines;
+        self.cursor_row += 1;
+        self.cursor_col = 0;
+    }
+
+    pub fn backspace(&mut self) {
+        if self.has_selection {
+            self.delete_selection();
+            return;
+        }
+        let row = self.cursor_row as usize;
+        if row >= self.lines.len() {
+            return;
+        }
+        if self.cursor_col > 0 {
+            let cur_line = self.lines[row].clone();
+            let col = self.cursor_col as usize;
+            let left = ui_str_slice(cur_line.clone(), 0, col - 1);
+            let right = ui_str_slice(cur_line.clone(), col, cur_line.len());
+            self.lines[row] = f"{left}{right}";
+            self.cursor_col -= 1;
+        } else if self.cursor_row > 0 {
+            let prev_idx = (self.cursor_row - 1) as usize;
+            let prev_line = self.lines[prev_idx].clone();
+            let cur_line = self.lines[row].clone();
+            let prev_len = prev_line.len() as i64;
+            self.lines[prev_idx] = f"{prev_line}{cur_line}";
+
+            let mut new_lines = Vec::<string>::new();
+            let mut i: usize = 0;
+            while i < self.lines.len() {
+                if i != row {
+                    new_lines.push(self.lines[i].clone());
+                }
+                i += 1;
+            }
+            self.lines = new_lines;
+            self.cursor_row -= 1;
+            self.cursor_col = prev_len;
+        }
+    }
+
+    pub fn move_left(&mut self) {
+        self.has_selection = false;
+        if self.cursor_col > 0 {
+            self.cursor_col -= 1;
+        } else if self.cursor_row > 0 {
+            self.cursor_row -= 1;
+            self.cursor_col = self.lines[self.cursor_row as usize].len() as i64;
+        }
+    }
+
+    pub fn move_right(&mut self) {
+        self.has_selection = false;
+        let row = self.cursor_row as usize;
+        if row < self.lines.len() {
+            if self.cursor_col < (self.lines[row].len() as i64) {
+                self.cursor_col += 1;
+            } else if (row + 1) < self.lines.len() {
+                self.cursor_row += 1;
+                self.cursor_col = 0;
+            }
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        self.has_selection = false;
+        if self.cursor_row > 0 {
+            self.cursor_row -= 1;
+            let row = self.cursor_row as usize;
+            let max_c = self.lines[row].len() as i64;
+            if self.cursor_col > max_c {
+                self.cursor_col = max_c;
+            }
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        self.has_selection = false;
+        if (self.cursor_row + 1) < (self.lines.len() as i64) {
+            self.cursor_row += 1;
+            let row = self.cursor_row as usize;
+            let max_c = self.lines[row].len() as i64;
+            if self.cursor_col > max_c {
+                self.cursor_col = max_c;
+            }
+        }
+    }
+
+    pub fn select_all(&mut self) {
+        if self.lines.len() == 0 {
+            return;
+        }
+        self.has_selection = true;
+        self.sel_start_row = 0;
+        self.sel_start_col = 0;
+        self.sel_end_row = (self.lines.len() as i64) - 1;
+        self.sel_end_col = self.lines[self.lines.len() - 1].len() as i64;
+        self.cursor_row = self.sel_end_row;
+        self.cursor_col = self.sel_end_col;
+    }
+
+    pub fn delete_selection(&mut self) {
+        if !self.has_selection {
+            return;
+        }
+        let mut s_r = self.sel_start_row;
+        let mut s_c = self.sel_start_col;
+        let mut e_r = self.sel_end_row;
+        let mut e_c = self.sel_end_col;
+
+        if s_r > e_r || (s_r == e_r && s_c > e_c) {
+            let tmp_r = s_r; let tmp_c = s_c;
+            s_r = e_r; s_c = e_c;
+            e_r = tmp_r; e_c = tmp_c;
+        }
+
+        if s_r == e_r {
+            let line = self.lines[s_r as usize].clone();
+            let left = ui_str_slice(line.clone(), 0, s_c as usize);
+            let right = ui_str_slice(line.clone(), e_c as usize, line.len());
+            self.lines[s_r as usize] = f"{left}{right}";
+        } else {
+            let first_line = self.lines[s_r as usize].clone();
+            let last_line = self.lines[e_r as usize].clone();
+            let left = ui_str_slice(first_line, 0, s_c as usize);
+            let right = ui_str_slice(last_line.clone(), e_c as usize, last_line.len());
+
+            let mut new_lines = Vec::<string>::new();
+            let mut i: usize = 0;
+            while i < (s_r as usize) {
+                new_lines.push(self.lines[i].clone());
+                i += 1;
+            }
+            new_lines.push(f"{left}{right}");
+            i = (e_r as usize) + 1;
+            while i < self.lines.len() {
+                new_lines.push(self.lines[i].clone());
+                i += 1;
+            }
+            self.lines = new_lines;
+        }
+
+        self.cursor_row = s_r;
+        self.cursor_col = s_c;
+        self.has_selection = false;
+    }
+}
+
+pub fn tw_textarea(id: string, style: string, model: TextAreaModel, is_focused: bool, cursor_blink: bool) -> ElementNode {
+    let spec = tw_parse_style(style);
+    let raw = ElementNode::new("textarea".to_string(), id.clone());
+    let mut area = tw_apply_style(raw, spec.clone());
+
+    if area.bounds.width <= 0 { area.bounds.width = 400; }
+    if area.bounds.height <= 0 { area.bounds.height = 160; }
+    if area.radius.top_left == 0 { area.radius = BorderRadius::all(8); }
+    if area.color.a == 0 { area.color = Color::from_hex("#0D111A".to_string()); }
+    if area.border_color.a == 0 { area.border_color = Color::rgba(255, 255, 255, 25); }
+
+    let char_w: i64 = 8;
+    let line_h = model.line_height;
+    let gutter_w = if model.show_line_numbers { 36 } else { 0 };
+
+    let mut cur_y = spec.pad_top + 4;
+    let mut line_idx: usize = 0;
+
+    while line_idx < model.lines.len() {
+        let line_text = model.lines[line_idx].clone();
+        let row_y = cur_y;
+
+        if model.show_line_numbers {
+            let num_str = f"{line_idx + 1}";
+            let mut num_node = tw_text(f"{id}_num_{line_idx}", num_str, "text-xs text-slate-500 font-medium".to_string());
+            num_node.bounds.x = spec.pad_left + 6;
+            num_node.bounds.y = row_y;
+            area.add_child(num_node);
+        }
+
+        let mut txt_node = tw_text(f"{id}_txt_{line_idx}", line_text.clone(), "text-sm text-slate-100".to_string());
+        txt_node.bounds.x = spec.pad_left + gutter_w + 8;
+        txt_node.bounds.y = row_y;
+        area.add_child(txt_node);
+
+        if is_focused && cursor_blink && (line_idx as i64) == model.cursor_row {
+            let cursor_x = spec.pad_left + gutter_w + 8 + (model.cursor_col * char_w);
+            let mut cursor_node = ElementNode::new("cursor".to_string(), f"{id}_caret");
+            cursor_node.bounds = Rect::new(cursor_x, row_y, 2, line_h - 4);
+            cursor_node.color = Color::from_hex("#6366F1".to_string());
+            area.add_child(cursor_node);
+        }
+
+        cur_y += line_h;
+        line_idx += 1;
+    }
+
+    return area;
+}
+
+// 15. Built-in Icon & Glyph Component
+pub fn tw_icon(id: string, name: string, style: string) -> ElementNode {
+    let glyph = if name == "search" { "🔍".to_string() }
+        else if name == "send" { "➤".to_string() }
+        else if name == "check" { "✓".to_string() }
+        else if name == "close" || name == "x" { "✕".to_string() }
+        else if name == "chevron-down" { "⌄".to_string() }
+        else if name == "chevron-right" { "›".to_string() }
+        else if name == "chevron-left" { "‹".to_string() }
+        else if name == "chevron-up" { "⌃".to_string() }
+        else if name == "settings" { "⚙".to_string() }
+        else if name == "bell" { "🔔".to_string() }
+        else if name == "lock" { "🔒".to_string() }
+        else if name == "user" { "👤".to_string() }
+        else if name == "hash" { "#".to_string() }
+        else if name == "dot" { "●".to_string() }
+        else if name == "plus" { "+".to_string() }
+        else if name == "minus" { "−".to_string() }
+        else { name.clone() };
+
+    return tw_text(id, glyph, style);
+}
+
+// 16. Modal Dialog & Overlay Component
+pub fn tw_modal(id: string, screen_w: i64, screen_h: i64, dialog_child: ElementNode) -> ElementNode {
+    let mut backdrop = ElementNode::new("modal_backdrop".to_string(), f"{id}_backdrop");
+    backdrop.bounds = Rect::new(0, 0, screen_w, screen_h);
+    backdrop.color = Color::rgba(0, 0, 0, 160);
+
+    let mut dialog = dialog_child;
+    dialog.bounds.x = (screen_w - dialog.bounds.width) / 2;
+    dialog.bounds.y = (screen_h - dialog.bounds.height) / 2;
+    backdrop.add_child(dialog);
+    return backdrop;
+}
+
+// 17. Tooltip Component
+pub fn tw_tooltip(id: string, label: string, style: string) -> ElementNode {
+    let txt = tw_text(f"{id}_t", label, "text-xs font-medium text-white".to_string());
+    let tip = tw_box(id, f"px-2 py-1 bg-slate-800 rounded shadow-md border border-white/10 {style}", txt);
+    return tip;
+}
+
+// Variadic Row Helpers
+pub fn tw_row_2(id: string, style: string, c1: ElementNode, c2: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    return tw_row(id, style, items);
+}
+
+pub fn tw_row_3(id: string, style: string, c1: ElementNode, c2: ElementNode, c3: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    items.push(c3);
+    return tw_row(id, style, items);
+}
+
+pub fn tw_row_4(id: string, style: string, c1: ElementNode, c2: ElementNode, c3: ElementNode, c4: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    items.push(c3);
+    items.push(c4);
+    return tw_row(id, style, items);
+}
+
+// Variadic Column Helpers
+pub fn tw_col_2(id: string, style: string, c1: ElementNode, c2: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    return tw_col(id, style, items);
+}
+
+pub fn tw_col_3(id: string, style: string, c1: ElementNode, c2: ElementNode, c3: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    items.push(c3);
+    return tw_col(id, style, items);
+}
+
+pub fn tw_col_4(id: string, style: string, c1: ElementNode, c2: ElementNode, c3: ElementNode, c4: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    items.push(c3);
+    items.push(c4);
+    return tw_col(id, style, items);
+}
+
+// Variadic Stack Helpers
+pub fn tw_stack_2(id: string, style: string, c1: ElementNode, c2: ElementNode) -> ElementNode {
+    let mut items = Vec::<ElementNode>::new();
+    items.push(c1);
+    items.push(c2);
+    return tw_stack(id, style, items);
+}
+
+// Fluent Class-Based Widgets
+pub struct Container {
+    pub id: string,
+    pub style_str: string,
+    pub on_click_id: string,
+    pub child_node: Option<ElementNode>,
+}
+
+impl Container {
+    pub fn new(id: string) -> Container {
+        return Container {
+            id,
+            style_str: "".to_string(),
+            on_click_id: "".to_string(),
+            child_node: None,
+        };
+    }
+
+    pub fn style(&mut self, s: string) {
+        self.style_str = s;
+    }
+
+    pub fn on_click(&mut self, action: string) {
+        self.on_click_id = action;
+    }
+
+    pub fn child(&mut self, c: ElementNode) {
+        self.child_node = Some(c);
+    }
+
+    pub fn build(&self) -> ElementNode {
+        let child = if self.child_node.is_some() { self.child_node.clone().unwrap() } else { ElementNode::new("empty".to_string(), "".to_string()) };
+        let mut node = tw_box(self.id.clone(), self.style_str.clone(), child);
+        if self.on_click_id.len() > 0 {
+            node.on_click_id = self.on_click_id.clone();
+        }
+        return node;
+    }
+}
+
+pub struct Row {
+    pub id: string,
+    pub style_str: string,
+    pub children_list: Vec<ElementNode>,
+}
+
+impl Row {
+    pub fn new(id: string, style: string) -> Row {
+        return Row {
+            id,
+            style_str: style,
+            children_list: Vec::<ElementNode>::new(),
+        };
+    }
+
+    pub fn style(&mut self, s: string) {
+        self.style_str = s;
+    }
+
+    pub fn add(&mut self, child: ElementNode) {
+        self.children_list.push(child);
+    }
+
+    pub fn build(&self) -> ElementNode {
+        return tw_row(self.id.clone(), self.style_str.clone(), self.children_list.clone());
+    }
+}
+
+pub struct Column {
+    pub id: string,
+    pub style_str: string,
+    pub children_list: Vec<ElementNode>,
+}
+
+impl Column {
+    pub fn new(id: string, style: string) -> Column {
+        return Column {
+            id,
+            style_str: style,
+            children_list: Vec::<ElementNode>::new(),
+        };
+    }
+
+    pub fn style(&mut self, s: string) {
+        self.style_str = s;
+    }
+
+    pub fn add(&mut self, child: ElementNode) {
+        self.children_list.push(child);
+    }
+
+    pub fn build(&self) -> ElementNode {
+        return tw_col(self.id.clone(), self.style_str.clone(), self.children_list.clone());
+    }
+}
+
+pub struct Grid {
+    pub id: string,
+    pub style_str: string,
+    pub cols: i64,
+    pub children_list: Vec<ElementNode>,
+}
+
+impl Grid {
+    pub fn new(id: string, style: string, cols: i64) -> Grid {
+        return Grid {
+            id,
+            style_str: style,
+            cols,
+            children_list: Vec::<ElementNode>::new(),
+        };
+    }
+
+    pub fn add(&mut self, child: ElementNode) {
+        self.children_list.push(child);
+    }
+
+    pub fn build(&self) -> ElementNode {
+        return tw_grid(self.id.clone(), self.style_str.clone(), self.cols, self.children_list.clone());
+    }
+}
+
+pub struct Stack {
+    pub id: string,
+    pub style_str: string,
+    pub children_list: Vec<ElementNode>,
+}
+
+impl Stack {
+    pub fn new(id: string, style: string) -> Stack {
+        return Stack {
+            id,
+            style_str: style,
+            children_list: Vec::<ElementNode>::new(),
+        };
+    }
+
+    pub fn add(&mut self, child: ElementNode) {
+        self.children_list.push(child);
+    }
+
+    pub fn build(&self) -> ElementNode {
+        return tw_stack(self.id.clone(), self.style_str.clone(), self.children_list.clone());
+    }
+}
+
+// ==========================================
+// 6. Virtualized ListView Layout Engine
 // ==========================================
 
 pub struct VirtualListLayout {
@@ -968,4 +2606,72 @@ pub fn find_clicked_action(node: ElementNode, click_pos: Point, offset: Point) -
     }
 
     return None;
+}
+
+// ==========================================
+// 8. Hot Reload & Live Preview DSL Evaluator
+// ==========================================
+
+pub fn tw_eval_dsl(dsl_text: string) -> ElementNode {
+    let lines = dsl_text.split("\n");
+    let mut root = ElementNode::new("container".to_string(), "dsl_root".to_string());
+    let mut i: usize = 0;
+    while i < lines.len() {
+        let line = lines[i].trim();
+        if line.len() == 0 || line.starts_with("//") {
+            i += 1;
+            continue;
+        }
+        let parts = line.split("\"");
+        if parts.len() >= 2 {
+            let cmd = parts[0].trim();
+            let style = parts[1].clone();
+            let arg = if parts.len() >= 4 { parts[3].clone() } else { "".to_string() };
+
+            if cmd == "box" || cmd == "card" {
+                let inner = if arg.len() > 0 { tw_text(f"dsl_t_{i}", arg, "text-sm text-white".to_string()) } else { ElementNode::new("empty".to_string(), "".to_string()) };
+                root.add_child(tw_box(f"dsl_{i}", style, inner));
+            } else if cmd == "text" {
+                root.add_child(tw_text(f"dsl_{i}", arg, style));
+            } else if cmd == "badge" {
+                root.add_child(tw_badge(f"dsl_{i}", arg, style));
+            } else if cmd == "avatar" {
+                root.add_child(tw_avatar(f"dsl_{i}", arg, style));
+            } else if cmd == "btn" || cmd == "button" {
+                root.add_child(tw_btn(f"dsl_{i}", arg, f"act_{i}", style));
+            } else if cmd == "divider" {
+                root.add_child(tw_divider(f"dsl_{i}", style));
+            }
+        }
+        i += 1;
+    }
+    return root;
+}
+
+pub struct HotReloadWatcher {
+    pub file_path: string,
+    pub last_content_len: usize,
+    pub last_eval_time_ms: i64,
+    pub is_dirty: bool,
+}
+
+impl HotReloadWatcher {
+    pub fn new(path: string) -> HotReloadWatcher {
+        return HotReloadWatcher {
+            file_path: path,
+            last_content_len: 0,
+            last_eval_time_ms: 0,
+            is_dirty: true,
+        };
+    }
+
+    pub fn check_reload(&mut self, current_content: string) -> bool {
+        let current_len = current_content.len();
+        if current_len != self.last_content_len {
+            self.last_content_len = current_len;
+            self.is_dirty = true;
+            return true;
+        }
+        return false;
+    }
 }
