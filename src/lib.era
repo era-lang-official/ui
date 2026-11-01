@@ -1,0 +1,971 @@
+// github.com/era-lang-official/ui
+// Official Declarative Reactive Widget Framework and Component Library for Era
+
+import "github.com/era-lang-official/draw";
+import "github.com/era-lang-official/layout";
+import "github.com/era-lang-official/platform";
+
+// ==========================================
+// 1. Reactive Signals (Fine-Grained State)
+// ==========================================
+
+pub struct SignalInt {
+    pub value: i64,
+    pub is_dirty: bool,
+    pub version: i64,
+}
+
+impl SignalInt {
+    pub fn new(initial: i64) -> SignalInt {
+        return SignalInt { value: initial, is_dirty: false, version: 1 };
+    }
+
+    pub fn get(&self) -> i64 {
+        return self.value;
+    }
+
+    pub fn set(&mut self, new_val: i64) {
+        if self.value != new_val {
+            self.value = new_val;
+            self.is_dirty = true;
+            self.version += 1;
+        }
+    }
+}
+
+pub struct SignalBool {
+    pub value: bool,
+    pub is_dirty: bool,
+}
+
+impl SignalBool {
+    pub fn new(initial: bool) -> SignalBool {
+        return SignalBool { value: initial, is_dirty: false };
+    }
+
+    pub fn get(&self) -> bool {
+        return self.value;
+    }
+
+    pub fn toggle(&mut self) {
+        self.value = !self.value;
+        self.is_dirty = true;
+    }
+}
+
+pub struct SignalStr {
+    pub value: string,
+    pub is_dirty: bool,
+}
+
+impl SignalStr {
+    pub fn new(initial: string) -> SignalStr {
+        return SignalStr { value: initial, is_dirty: false };
+    }
+
+    pub fn get(&self) -> string {
+        return self.value.clone();
+    }
+
+    pub fn set(&mut self, s: string) {
+        self.value = s;
+        self.is_dirty = true;
+    }
+}
+
+// ==========================================
+// 2. Build Context & Theming
+// ==========================================
+
+pub struct BuildContext {
+    pub window_size: Size,
+    pub is_dark: bool,
+    pub primary: Color,
+    pub surface: Color,
+    pub card_bg: Color,
+    pub card_border: Color,
+    pub text_primary: Color,
+    pub text_secondary: Color,
+}
+
+impl BuildContext {
+    pub fn modern_dark(size: Size) -> BuildContext {
+        return BuildContext {
+            window_size: size,
+            is_dark: true,
+            primary: Color::from_hex("#6366F1".to_string()), // Modern Indigo / Violet
+            surface: Color::from_hex("#0B0D14".to_string()), // Deep Zinc / Obsidian
+            card_bg: Color::from_hex("#131622".to_string()),
+            card_border: Color::rgba(255, 255, 255, 22),
+            text_primary: Color::from_hex("#F8FAFC".to_string()),
+            text_secondary: Color::from_hex("#94A3B8".to_string()),
+        };
+    }
+}
+
+// ==========================================
+// 2b. Modern Color Scheme Specification (Material 3 Dark Palette)
+// ==========================================
+
+pub struct ColorScheme {
+    pub surface: Color,
+    pub surface_dim: Color,
+    pub surface_container_lowest: Color,
+    pub surface_container_low: Color,
+    pub surface_container: Color,
+    pub surface_container_high: Color,
+    pub surface_container_highest: Color,
+    pub primary: Color,
+    pub primary_hover: Color,
+    pub primary_pressed: Color,
+    pub on_primary: Color,
+    pub primary_container: Color,
+    pub on_primary_container: Color,
+    pub secondary: Color,
+    pub on_secondary: Color,
+    pub tertiary: Color,
+    pub on_surface: Color,
+    pub on_surface_variant: Color,
+    pub outline: Color,
+    pub outline_variant: Color,
+    pub error: Color,
+}
+
+impl ColorScheme {
+    pub fn dark() -> ColorScheme {
+        return ColorScheme {
+            surface: Color::from_hex("#090C15".to_string()),
+            surface_dim: Color::from_hex("#06080E".to_string()),
+            surface_container_lowest: Color::from_hex("#0D111C".to_string()),
+            surface_container_low: Color::from_hex("#121726".to_string()),
+            surface_container: Color::from_hex("#171D2F".to_string()),
+            surface_container_high: Color::from_hex("#1F273E".to_string()),
+            surface_container_highest: Color::from_hex("#28324E".to_string()),
+            primary: Color::from_hex("#6366F1".to_string()), // Indigo 500
+            primary_hover: Color::from_hex("#818CF8".to_string()), // Indigo 400
+            primary_pressed: Color::from_hex("#4F46E5".to_string()), // Indigo 600
+            on_primary: Color::from_hex("#FFFFFF".to_string()),
+            primary_container: Color::from_hex("#312E81".to_string()),
+            on_primary_container: Color::from_hex("#E0E7FF".to_string()),
+            secondary: Color::from_hex("#06B6D4".to_string()), // Cyan 500
+            on_secondary: Color::from_hex("#FFFFFF".to_string()),
+            tertiary: Color::from_hex("#10B981".to_string()), // Emerald 500
+            on_surface: Color::from_hex("#F8FAFC".to_string()), // Pure White Zinc 50
+            on_surface_variant: Color::from_hex("#94A3B8".to_string()), // Zinc 400
+            outline: Color::from_hex("#334155".to_string()), // Zinc 700
+            outline_variant: Color::rgba(255, 255, 255, 20),
+            error: Color::from_hex("#EF4444".to_string()),
+        };
+    }
+
+    pub fn apply_state_layer(&self, base: Color, is_hovered: bool, is_pressed: bool) -> Color {
+        if is_pressed {
+            let r = if base.r + 30 > 255 { 255 } else { base.r + 30 };
+            let g = if base.g + 30 > 255 { 255 } else { base.g + 30 };
+            let b = if base.b + 30 > 255 { 255 } else { base.b + 30 };
+            return Color::rgba(r, g, b, base.a);
+        } else if is_hovered {
+            let r = if base.r + 18 > 255 { 255 } else { base.r + 18 };
+            let g = if base.g + 18 > 255 { 255 } else { base.g + 18 };
+            let b = if base.b + 18 > 255 { 255 } else { base.b + 18 };
+            return Color::rgba(r, g, b, base.a);
+        }
+        return base;
+    }
+}
+
+// ==========================================
+// 2c. Three-Tree Reconciliation & Diffing Cache
+// ==========================================
+
+pub struct UIEngineCache {
+    pub dirty_count: i64,
+    pub cache_hits: i64,
+    pub frame_counter: i64,
+}
+
+impl UIEngineCache {
+    pub fn new() -> UIEngineCache {
+        return UIEngineCache {
+            dirty_count: 0,
+            cache_hits: 0,
+            frame_counter: 0,
+        };
+    }
+
+    pub fn register_frame(&mut self, has_state_changes: bool) -> bool {
+        self.frame_counter += 1;
+        if has_state_changes {
+            self.dirty_count += 1;
+            return true;
+        }
+        self.cache_hits += 1;
+        return false;
+    }
+}
+
+// ==========================================
+// 2d. Gesture Arena (Tap vs Drag Disambiguation)
+// ==========================================
+
+pub struct GestureArena {
+    pub down_x: i64,
+    pub down_y: i64,
+    pub current_x: i64,
+    pub current_y: i64,
+    pub is_tracking: bool,
+    pub drag_claimed: bool,
+    pub slop_threshold: i64,
+    pub active_candidate_id: string,
+    pub hovered_id: string,
+}
+
+impl GestureArena {
+    pub fn new() -> GestureArena {
+        return GestureArena {
+            down_x: 0,
+            down_y: 0,
+            current_x: 0,
+            current_y: 0,
+            is_tracking: false,
+            drag_claimed: false,
+            slop_threshold: 8,
+            active_candidate_id: "".to_string(),
+            hovered_id: "".to_string(),
+        };
+    }
+
+    pub fn on_pointer_down(&mut self, x: i64, y: i64, candidate_id: string) {
+        self.down_x = x;
+        self.down_y = y;
+        self.current_x = x;
+        self.current_y = y;
+        self.is_tracking = true;
+        self.drag_claimed = false;
+        self.active_candidate_id = candidate_id;
+    }
+
+    pub fn on_pointer_move(&mut self, x: i64, y: i64) -> bool {
+        self.current_x = x;
+        self.current_y = y;
+        if self.is_tracking && !self.drag_claimed {
+            let dx = if x > self.down_x { x - self.down_x } else { self.down_x - x };
+            let dy = if y > self.down_y { y - self.down_y } else { self.down_y - y };
+            if dx > self.slop_threshold || dy > self.slop_threshold {
+                self.drag_claimed = true;
+                return true;
+            }
+        }
+        return self.drag_claimed;
+    }
+
+    pub fn on_pointer_up(&mut self) -> Option<string> {
+        if !self.is_tracking {
+            return None;
+        }
+        self.is_tracking = false;
+        if self.drag_claimed {
+            self.drag_claimed = false;
+            return None;
+        }
+        let action = self.active_candidate_id.clone();
+        self.active_candidate_id = "".to_string();
+        if action.len() > 0 {
+            return Some(action);
+        }
+        return None;
+    }
+}
+
+// ==========================================
+// 2e. Discrete Spring & Lerp Ticker
+// ==========================================
+
+pub struct SpringTicker {
+    pub current: i64,
+    pub target: i64,
+    pub speed: i64,
+}
+
+impl SpringTicker {
+    pub fn new(initial: i64) -> SpringTicker {
+        return SpringTicker { current: initial, target: initial, speed: 4 };
+    }
+
+    pub fn set_target(&mut self, target: i64) {
+        self.target = target;
+    }
+
+    pub fn step(&mut self) -> bool {
+        if self.current == self.target {
+            return false;
+        }
+        let diff = self.target - self.current;
+        let delta = if diff > 0 { (diff / self.speed) + 1 } else { (diff / self.speed) - 1 };
+        self.current += delta;
+        return true;
+    }
+}
+
+// ==========================================
+// 3. The Core Element Node (Render Tree)
+// ==========================================
+
+pub struct ElementNode {
+    pub tag: string, // "container", "text", "button", "row", "column", "card", "scroll"
+    pub id: string,
+    pub bounds: Rect,
+    pub color: Color,
+    pub border_color: Color,
+    pub is_gradient: bool,
+    pub grad_color: Color,
+    pub text: string,
+    pub font_size: i64,
+    pub is_bold: bool,
+    pub radius: BorderRadius,
+    pub shadow: Shadow,
+    pub flex: i64,
+    pub on_click_id: string,
+    pub children: Vec<ElementNode>,
+}
+
+impl ElementNode {
+    pub fn new(tag: string, id: string) -> ElementNode {
+        return ElementNode {
+            tag,
+            id,
+            bounds: Rect::zero(),
+            color: Color::transparent(),
+            border_color: Color::transparent(),
+            is_gradient: false,
+            grad_color: Color::transparent(),
+            text: "".to_string(),
+            font_size: 14,
+            is_bold: false,
+            radius: BorderRadius::zero(),
+            shadow: Shadow::none(),
+            flex: 0,
+            on_click_id: "".to_string(),
+            children: Vec::<ElementNode>::new(),
+        };
+    }
+
+    pub fn add_child(&mut self, child: ElementNode) {
+        self.children.push(child);
+    }
+}
+
+// ==========================================
+// 4. Standard Widget Constructors
+// ==========================================
+
+pub fn ui_text(id: string, text: string, font_size: i64, color: Color) -> ElementNode {
+    let mut node = ElementNode::new("text".to_string(), id);
+    node.text = text;
+    node.font_size = font_size;
+    node.color = color;
+    node.is_bold = false;
+    let text_len = node.text.len() as i64;
+    let approx_width = (text_len * font_size * 6) / 10;
+    node.bounds = Rect::new(0, 0, approx_width, font_size + 4);
+    return node;
+}
+
+pub fn ui_text_bold(id: string, text: string, font_size: i64, color: Color) -> ElementNode {
+    let mut node = ui_text(id, text, font_size, color);
+    node.is_bold = true;
+    return node;
+}
+
+pub fn ui_str_pop(s: string) -> string {
+    if s.len() <= 1 {
+        return "".to_string();
+    }
+    let chars: Vec<char> = s.chars();
+    let mut sb = StringBuilder::new();
+    let mut i: usize = 0;
+    while i < chars.len() - 1 {
+        sb.append(chars[i].to_string());
+        i += 1;
+    }
+    return sb.to_string();
+}
+
+pub fn ui_badge(id: string, text: string, bg_color: Color, text_color: Color) -> ElementNode {
+    let mut b = ElementNode::new("badge".to_string(), id.clone());
+    b.color = bg_color;
+    b.border_color = Color::rgba(255, 255, 255, 30);
+    b.radius = BorderRadius::all(11);
+    let txt = ui_text_bold(f"{id}_t", text, 11, text_color);
+    b.bounds = Rect::new(0, 0, txt.bounds.width + 18, 22);
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 9;
+    pos_txt.bounds.y = 2;
+    b.add_child(pos_txt);
+    return b;
+}
+
+pub fn ui_button(id: string, label: string, on_click_id: string, bg_color: Color, text_color: Color) -> ElementNode {
+    let mut btn = ElementNode::new("button".to_string(), id.clone());
+    btn.color = bg_color;
+    btn.border_color = Color::rgba(255, 255, 255, 35);
+    btn.radius = BorderRadius::all(8);
+    btn.shadow = Shadow::new(0, 2, 8, Color::rgba(0, 0, 0, 50));
+    btn.on_click_id = on_click_id;
+
+    let txt = ui_text_bold(f"{id}_lbl", label, 13, text_color);
+    let btn_w = txt.bounds.width + 28;
+    let btn_h = 36;
+    btn.bounds = Rect::new(0, 0, btn_w, btn_h);
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 14;
+    pos_txt.bounds.y = 8;
+    btn.add_child(pos_txt);
+    return btn;
+}
+
+pub fn ui_card(id: string, bg_color: Color, child: ElementNode) -> ElementNode {
+    let mut card = ElementNode::new("card".to_string(), id);
+    card.color = bg_color;
+    card.border_color = Color::rgba(255, 255, 255, 20);
+    card.radius = BorderRadius::all(12);
+    card.shadow = Shadow::new(0, 4, 16, Color::rgba(0, 0, 0, 80));
+
+    let mut positioned_child = child.clone();
+    positioned_child.bounds.x = 20;
+    positioned_child.bounds.y = 18;
+    card.bounds = Rect::new(0, 0, child.bounds.width + 40, child.bounds.height + 36);
+    card.add_child(positioned_child);
+    return card;
+}
+
+pub fn ui_gradient_card(id: string, c1: Color, c2: Color, child: ElementNode) -> ElementNode {
+    let mut card = ElementNode::new("gradient_card".to_string(), id);
+    card.is_gradient = true;
+    card.color = c1;
+    card.grad_color = c2;
+    card.border_color = Color::rgba(255, 255, 255, 25);
+    card.radius = BorderRadius::all(12);
+    card.shadow = Shadow::new(0, 4, 16, Color::rgba(0, 0, 0, 90));
+
+    let mut positioned_child = child.clone();
+    positioned_child.bounds.x = 20;
+    positioned_child.bounds.y = 18;
+    card.bounds = Rect::new(0, 0, child.bounds.width + 40, child.bounds.height + 36);
+    card.add_child(positioned_child);
+    return card;
+}
+
+pub fn ui_container(id: string, width: i64, height: i64, bg_color: Color, child: ElementNode) -> ElementNode {
+    let mut c = ElementNode::new("container".to_string(), id);
+    c.bounds = Rect::new(0, 0, width, height);
+    c.color = bg_color;
+    c.add_child(child);
+    return c;
+}
+
+pub fn ui_row(id: string, children: Vec<ElementNode>, spacing: i64) -> ElementNode {
+    let mut row = ElementNode::new("row".to_string(), id);
+    let mut cur_x: i64 = 0;
+    let mut max_h: i64 = 0;
+
+    let mut i: usize = 0;
+    while i < children.len() {
+        let mut child = children[i].clone();
+        child.bounds.x = cur_x;
+        cur_x += child.bounds.width + spacing;
+        if child.bounds.height > max_h {
+            max_h = child.bounds.height;
+        }
+        row.add_child(child);
+        i += 1;
+    }
+
+    let total_w = if children.len() > 0 { cur_x - spacing } else { 0 };
+    row.bounds = Rect::new(0, 0, total_w, max_h);
+    return row;
+}
+
+pub fn ui_column(id: string, children: Vec<ElementNode>, spacing: i64) -> ElementNode {
+    let mut col = ElementNode::new("column".to_string(), id);
+    let mut cur_y: i64 = 0;
+    let mut max_w: i64 = 0;
+
+    let mut i: usize = 0;
+    while i < children.len() {
+        let mut child = children[i].clone();
+        child.bounds.y = cur_y;
+        cur_y += child.bounds.height + spacing;
+        if child.bounds.width > max_w {
+            max_w = child.bounds.width;
+        }
+        col.add_child(child);
+        i += 1;
+    }
+
+    let total_h = if children.len() > 0 { cur_y - spacing } else { 0 };
+    col.bounds = Rect::new(0, 0, max_w, total_h);
+    return col;
+}
+
+pub fn ui_progress_bar(id: string, percent: i64, width: i64) -> ElementNode {
+    let mut bar = ElementNode::new("progress".to_string(), id.clone());
+    bar.color = Color::from_hex("#1E2433".to_string());
+    bar.border_color = Color::rgba(255, 255, 255, 15);
+    bar.radius = BorderRadius::all(4);
+    bar.bounds = Rect::new(0, 0, width, 8);
+
+    let clamped = if percent < 0 { 0 } else if percent > 100 { 100 } else { percent };
+    let fill_w = (width * clamped) / 100;
+    if fill_w > 0 {
+        let mut fill = ElementNode::new("progress_fill".to_string(), f"{id}_fill");
+        fill.color = Color::from_hex("#6366F1".to_string());
+        fill.radius = BorderRadius::all(4);
+        fill.bounds = Rect::new(0, 0, fill_w, 8);
+        bar.add_child(fill);
+    }
+    return bar;
+}
+
+pub fn ui_switch(id: string, is_on: bool, on_click_id: string) -> ElementNode {
+    let mut sw = ElementNode::new("switch".to_string(), id.clone());
+    sw.color = if is_on { Color::from_hex("#10B981".to_string()) } else { Color::from_hex("#252A3B".to_string()) };
+    sw.border_color = if is_on { Color::rgba(255, 255, 255, 40) } else { Color::rgba(255, 255, 255, 20) };
+    sw.radius = BorderRadius::all(14);
+    sw.bounds = Rect::new(0, 0, 52, 28);
+    sw.on_click_id = on_click_id;
+
+    let thumb_x = if is_on { 26 } else { 3 };
+    let mut thumb = ElementNode::new("switch_thumb".to_string(), f"{id}_thumb");
+    thumb.color = Color::white();
+    thumb.radius = BorderRadius::all(11);
+    thumb.bounds = Rect::new(thumb_x, 3, 22, 22);
+    thumb.shadow = Shadow::new(0, 2, 6, Color::rgba(0, 0, 0, 90));
+    sw.add_child(thumb);
+    return sw;
+}
+
+pub fn ui_slider(id: string, value: i64, width: i64, on_click_id: string) -> ElementNode {
+    let mut s = ElementNode::new("slider".to_string(), id.clone());
+    s.bounds = Rect::new(0, 0, width, 24);
+    s.on_click_id = on_click_id;
+
+    let mut track = ElementNode::new("slider_track".to_string(), f"{id}_track");
+    track.color = Color::from_hex("#1E2433".to_string());
+    track.border_color = Color::rgba(255, 255, 255, 15);
+    track.radius = BorderRadius::all(3);
+    track.bounds = Rect::new(0, 9, width, 6);
+
+    let clamped = if value < 0 { 0 } else if value > 100 { 100 } else { value };
+    let fill_w = (width * clamped) / 100;
+    if fill_w > 0 {
+        let mut active = ElementNode::new("slider_fill".to_string(), f"{id}_act");
+        active.color = Color::from_hex("#6366F1".to_string());
+        active.radius = BorderRadius::all(3);
+        active.bounds = Rect::new(0, 9, fill_w, 6);
+        track.add_child(active);
+    }
+    s.add_child(track);
+
+    let knob_x = if fill_w > 9 { fill_w - 9 } else { 0 };
+    let mut knob = ElementNode::new("slider_knob".to_string(), f"{id}_knob");
+    knob.color = Color::white();
+    knob.radius = BorderRadius::all(9);
+    knob.bounds = Rect::new(knob_x, 3, 18, 18);
+    knob.shadow = Shadow::new(0, 2, 8, Color::rgba(0, 0, 0, 110));
+    s.add_child(knob);
+    return s;
+}
+
+pub fn ui_checkbox(id: string, checked: bool, label: string, on_click_id: string) -> ElementNode {
+    let mut cb = ElementNode::new("checkbox".to_string(), id.clone());
+    cb.on_click_id = on_click_id;
+
+    let mut box_node = ElementNode::new("cb_box".to_string(), f"{id}_box");
+    box_node.color = if checked { Color::from_hex("#10B981".to_string()) } else { Color::from_hex("#1E2433".to_string()) };
+    box_node.border_color = if checked { Color::white() } else { Color::rgba(255, 255, 255, 45) };
+    box_node.radius = BorderRadius::all(6);
+    box_node.bounds = Rect::new(0, 2, 22, 22);
+
+    if checked {
+        let mut check_mark = ui_text_bold(f"{id}_chk", "v".to_string(), 12, Color::white());
+        check_mark.bounds.x = 6;
+        check_mark.bounds.y = 2;
+        box_node.add_child(check_mark);
+    }
+
+    let txt = ui_text(f"{id}_txt", label, 14, Color::from_hex("#F1F5F9".to_string()));
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 32;
+    pos_txt.bounds.y = 3;
+
+    cb.bounds = Rect::new(0, 0, txt.bounds.width + 42, 28);
+    cb.add_child(box_node);
+    cb.add_child(pos_txt);
+    return cb;
+}
+
+pub fn ui_text_field(id: string, current_text: string, placeholder: string, is_focused: bool, width: i64) -> ElementNode {
+    let mut tf = ElementNode::new("textfield".to_string(), id.clone());
+    tf.bounds = Rect::new(0, 0, width, 42);
+    tf.on_click_id = id.clone();
+    tf.radius = BorderRadius::all(8);
+    tf.color = Color::from_hex("#121520".to_string());
+    tf.border_color = if is_focused { Color::from_hex("#6366F1".to_string()) } else { Color::rgba(255, 255, 255, 20) };
+
+    if is_focused {
+        tf.shadow = Shadow::new(0, 0, 8, Color::rgba(99, 102, 241, 100));
+    }
+
+    let display_str = if current_text.len() > 0 {
+        if is_focused { f"{current_text}|" } else { current_text }
+    } else {
+        if is_focused { "|".to_string() } else { placeholder }
+    };
+
+    let text_col = if current_text.len() > 0 || is_focused { Color::from_hex("#F8FAFC".to_string()) } else { Color::from_hex("#64748B".to_string()) };
+    let mut inner_txt = ui_text(f"{id}_txt", display_str, 14, text_col);
+    inner_txt.bounds.x = 14;
+    inner_txt.bounds.y = 11;
+    tf.add_child(inner_txt);
+
+    return tf;
+}
+
+// ==========================================
+// 4b. Modern Open-Source Component Suite (M3 Specification)
+// ==========================================
+
+pub fn ui_m3_filled_button(id: string, label: string, on_click_id: string, is_hovered: bool, is_pressed: bool, cs: ColorScheme) -> ElementNode {
+    let mut btn = ElementNode::new("button".to_string(), id.clone());
+    let txt = ui_text_bold(f"{id}_lbl", label, 14, cs.on_primary.clone());
+    let btn_w = txt.bounds.width + 44;
+    let btn_h = 44;
+    btn.bounds = Rect::new(0, 0, btn_w, btn_h);
+    btn.on_click_id = on_click_id;
+    btn.radius = BorderRadius::all(22);
+
+    if is_pressed {
+        btn.color = cs.primary_pressed.clone();
+        btn.border_color = Color::rgba(255, 255, 255, 90);
+        btn.shadow = Shadow::new(0, 1, 4, Color::rgba(0, 0, 0, 80));
+    } else if is_hovered {
+        btn.color = cs.primary_hover.clone();
+        btn.border_color = Color::white();
+        btn.shadow = Shadow::new(0, 4, 18, Color::rgba(99, 102, 241, 150));
+    } else {
+        btn.color = cs.primary.clone();
+        btn.border_color = Color::rgba(255, 255, 255, 45);
+        btn.shadow = Shadow::new(0, 2, 10, Color::rgba(0, 0, 0, 70));
+    }
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 22;
+    pos_txt.bounds.y = 13;
+    btn.add_child(pos_txt);
+    return btn;
+}
+
+pub fn ui_m3_tonal_button(id: string, label: string, on_click_id: string, is_hovered: bool, cs: ColorScheme) -> ElementNode {
+    let mut btn = ElementNode::new("button".to_string(), id.clone());
+    let txt = ui_text_bold(f"{id}_lbl", label, 14, cs.on_primary_container.clone());
+    let btn_w = txt.bounds.width + 44;
+    let btn_h = 44;
+    btn.bounds = Rect::new(0, 0, btn_w, btn_h);
+    btn.on_click_id = on_click_id;
+    btn.radius = BorderRadius::all(22);
+
+    if is_hovered {
+        btn.color = Color::from_hex("#3730A3".to_string());
+        btn.border_color = Color::from_hex("#818CF8".to_string());
+        btn.shadow = Shadow::new(0, 4, 16, Color::rgba(99, 102, 241, 140));
+    } else {
+        btn.color = cs.primary_container.clone(); // Vibrant M3 tonal container #312E81
+        btn.border_color = Color::rgba(129, 140, 248, 70);
+        btn.shadow = Shadow::new(0, 2, 8, Color::rgba(49, 46, 129, 80));
+    }
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 22;
+    pos_txt.bounds.y = 13;
+    btn.add_child(pos_txt);
+    return btn;
+}
+
+pub fn ui_m3_outlined_button(id: string, label: string, on_click_id: string, is_hovered: bool, cs: ColorScheme) -> ElementNode {
+    let mut btn = ElementNode::new("button".to_string(), id.clone());
+    let txt = ui_text_bold(f"{id}_lbl", label, 14, cs.primary_hover.clone());
+    let btn_w = txt.bounds.width + 44;
+    let btn_h = 44;
+    btn.bounds = Rect::new(0, 0, btn_w, btn_h);
+    btn.on_click_id = on_click_id;
+    btn.radius = BorderRadius::all(22);
+
+    if is_hovered {
+        btn.color = Color::rgba(99, 102, 241, 50);
+        btn.border_color = Color::white();
+        btn.shadow = Shadow::new(0, 4, 14, Color::rgba(99, 102, 241, 100));
+    } else {
+        btn.color = Color::rgba(99, 102, 241, 15);
+        btn.border_color = cs.primary.clone();
+    }
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 22;
+    pos_txt.bounds.y = 13;
+    btn.add_child(pos_txt);
+    return btn;
+}
+
+pub fn ui_m3_switch(id: string, checked: bool, on_click_id: string, cs: ColorScheme) -> ElementNode {
+    let mut sw = ElementNode::new("switch".to_string(), id.clone());
+    sw.bounds = Rect::new(0, 0, 56, 32);
+    sw.radius = BorderRadius::all(16);
+    sw.on_click_id = on_click_id;
+
+    if checked {
+        sw.color = Color::from_hex("#10B981".to_string());
+        sw.border_color = Color::rgba(255, 255, 255, 60);
+        sw.shadow = Shadow::new(0, 2, 10, Color::rgba(16, 185, 129, 90));
+        let mut thumb = ElementNode::new("switch_thumb".to_string(), f"{id}_thumb");
+        thumb.color = Color::white();
+        thumb.radius = BorderRadius::all(12);
+        thumb.bounds = Rect::new(27, 4, 24, 24);
+        thumb.shadow = Shadow::new(0, 2, 6, Color::rgba(0, 0, 0, 90));
+        sw.add_child(thumb);
+    } else {
+        sw.color = Color::from_hex("#1E2433".to_string());
+        sw.border_color = Color::rgba(255, 255, 255, 30);
+        let mut thumb = ElementNode::new("switch_thumb".to_string(), f"{id}_thumb");
+        thumb.color = Color::from_hex("#64748B".to_string());
+        thumb.radius = BorderRadius::all(11);
+        thumb.bounds = Rect::new(5, 5, 22, 22);
+        sw.add_child(thumb);
+    }
+    return sw;
+}
+
+pub fn ui_m3_slider(id: string, pct: i64, width: i64, on_click_id: string, cs: ColorScheme) -> ElementNode {
+    let mut s = ElementNode::new("slider".to_string(), id.clone());
+    s.bounds = Rect::new(0, 0, width, 40);
+    s.on_click_id = on_click_id;
+
+    let clamped = if pct < 0 { 0 } else if pct > 100 { 100 } else { pct };
+    let fill_w = (width * clamped) / 100;
+
+    let mut inactive_track = ElementNode::new("s_inact".to_string(), f"{id}_inact");
+    inactive_track.bounds = Rect::new(0, 18, width, 4);
+    inactive_track.radius = BorderRadius::all(2);
+    inactive_track.color = cs.surface_container_highest.clone();
+    s.add_child(inactive_track);
+
+    if fill_w > 0 {
+        let mut active_track = ElementNode::new("s_act".to_string(), f"{id}_act");
+        active_track.bounds = Rect::new(0, 18, fill_w, 4);
+        active_track.radius = BorderRadius::all(2);
+        active_track.color = cs.primary.clone();
+        s.add_child(active_track);
+    }
+
+    let thumb_x = if fill_w > 10 { fill_w - 10 } else { 0 };
+    let mut thumb = ElementNode::new("s_thumb".to_string(), f"{id}_thumb");
+    thumb.bounds = Rect::new(thumb_x, 10, 20, 20);
+    thumb.radius = BorderRadius::all(10);
+    thumb.color = cs.primary.clone();
+    thumb.border_color = Color::white();
+    thumb.shadow = Shadow::new(0, 2, 8, Color::rgba(0, 0, 0, 120));
+    s.add_child(thumb);
+
+    return s;
+}
+
+pub fn ui_m3_text_field(id: string, current_text: string, placeholder: string, is_focused: bool, width: i64, cs: ColorScheme) -> ElementNode {
+    let mut tf = ElementNode::new("textfield".to_string(), id.clone());
+    tf.bounds = Rect::new(0, 0, width, 50);
+    tf.on_click_id = id.clone();
+    tf.radius = BorderRadius::all(10);
+    tf.color = cs.surface_container_lowest.clone();
+    tf.border_color = if is_focused { cs.primary.clone() } else { Color::rgba(255, 255, 255, 35) };
+
+    if is_focused {
+        tf.shadow = Shadow::new(0, 0, 14, Color::rgba(99, 102, 241, 140));
+    }
+
+    let display_str = if current_text.len() > 0 {
+        if is_focused { f"{current_text}|" } else { current_text }
+    } else {
+        if is_focused { "|".to_string() } else { placeholder }
+    };
+
+    let text_col = if current_text.len() > 0 || is_focused { cs.on_surface.clone() } else { cs.on_surface_variant.clone() };
+    let mut inner_txt = ui_text(f"{id}_txt", display_str, 14, text_col);
+    inner_txt.bounds.x = 18;
+    inner_txt.bounds.y = 15;
+    tf.add_child(inner_txt);
+    return tf;
+}
+
+pub fn ui_m3_card(id: string, child: ElementNode, cs: ColorScheme) -> ElementNode {
+    let mut card = ElementNode::new("card".to_string(), id);
+    card.color = cs.surface_container.clone();
+    card.border_color = cs.outline_variant.clone();
+    card.radius = BorderRadius::all(16);
+    card.shadow = Shadow::new(0, 4, 18, Color::rgba(0, 0, 0, 90));
+
+    let mut positioned_child = child.clone();
+    positioned_child.bounds.x = 22;
+    positioned_child.bounds.y = 20;
+    card.bounds = Rect::new(0, 0, child.bounds.width + 44, child.bounds.height + 40);
+    card.add_child(positioned_child);
+    return card;
+}
+
+pub fn ui_m3_chip(id: string, label: string, is_active: bool, on_click_id: string, cs: ColorScheme) -> ElementNode {
+    let mut chip = ElementNode::new("chip".to_string(), id.clone());
+    chip.on_click_id = on_click_id;
+    chip.radius = BorderRadius::all(8);
+    chip.color = if is_active { cs.surface_container_high.clone() } else { cs.surface_container_low.clone() };
+    chip.border_color = if is_active { cs.primary.clone() } else { cs.outline_variant.clone() };
+
+    let mut dot = ElementNode::new("dot".to_string(), f"{id}_dot");
+    dot.bounds = Rect::new(10, 12, 8, 8);
+    dot.radius = BorderRadius::all(4);
+    dot.color = if is_active { cs.tertiary.clone() } else { cs.on_surface_variant.clone() };
+    chip.add_child(dot);
+
+    let txt = ui_text_bold(f"{id}_txt", label, 12, if is_active { cs.on_surface.clone() } else { cs.on_surface_variant.clone() });
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 24;
+    pos_txt.bounds.y = 8;
+    chip.add_child(pos_txt);
+
+    chip.bounds = Rect::new(0, 0, txt.bounds.width + 36, 32);
+    return chip;
+}
+
+pub fn ui_m3_tab_pill(id: string, label: string, is_active: bool, on_click_id: string, cs: ColorScheme) -> ElementNode {
+    let mut pill = ElementNode::new("tab_pill".to_string(), id.clone());
+    pill.on_click_id = on_click_id;
+    pill.radius = BorderRadius::all(19);
+
+    if is_active {
+        pill.color = cs.primary.clone();
+        pill.border_color = Color::rgba(255, 255, 255, 70);
+        pill.shadow = Shadow::new(0, 4, 14, Color::rgba(99, 102, 241, 130));
+    } else {
+        pill.color = cs.surface_container_high.clone();
+        pill.border_color = Color::rgba(255, 255, 255, 25);
+    }
+
+    let txt = ui_text_bold(f"{id}_txt", label, 13, if is_active { cs.on_primary.clone() } else { cs.on_surface_variant.clone() });
+    let pill_w = txt.bounds.width + 32;
+    pill.bounds = Rect::new(0, 0, pill_w, 38);
+
+    let mut pos_txt = txt.clone();
+    pos_txt.bounds.x = 16;
+    pos_txt.bounds.y = 10;
+    pill.add_child(pos_txt);
+    return pill;
+}
+
+// ==========================================
+// 5. Virtualized ListView Layout Engine
+// ==========================================
+
+pub struct VirtualListLayout {
+    pub total_items: i64,
+    pub item_height: i64,
+    pub viewport_height: i64,
+    pub scroll_offset_y: i64,
+    pub visible_start_index: i64,
+    pub visible_count: i64,
+}
+
+impl VirtualListLayout {
+    pub fn compute(total_items: i64, item_height: i64, viewport_h: i64, scroll_y: i64) -> VirtualListLayout {
+        let clamped_scroll = if scroll_y < 0 { 0 } else { scroll_y };
+        let start_idx = clamped_scroll / item_height;
+        let count = (viewport_h / item_height) + 2;
+        let final_count = if (start_idx + count) > total_items { total_items - start_idx } else { count };
+
+        return VirtualListLayout {
+            total_items,
+            item_height,
+            viewport_height: viewport_h,
+            scroll_offset_y: clamped_scroll,
+            visible_start_index: start_idx,
+            visible_count: if final_count > 0 { final_count } else { 0 },
+        };
+    }
+}
+
+// ==========================================
+// 6. UI Render Pipeline (Emits DisplayList)
+// ==========================================
+
+pub fn render_node(node: ElementNode, offset: Point, dl: &mut DisplayList) {
+    let cur_pos = Point::new(offset.x + node.bounds.x, offset.y + node.bounds.y);
+    let draw_rect = Rect::new(cur_pos.x, cur_pos.y, node.bounds.width, node.bounds.height);
+
+    // 1. Draw smooth multi-layer shadow if present
+    if node.shadow.blur > 0 {
+        dl.draw_shadow(draw_rect.clone(), node.radius.clone(), node.shadow.clone());
+    }
+
+    // 2. Draw background (only for non-text elements)
+    if node.tag != "text" {
+        if node.is_gradient {
+            dl.draw_gradient_card(draw_rect.clone(), node.radius.clone(), node.color.clone(), node.grad_color.clone(), node.border_color.clone());
+        } else if node.color.a > 0 {
+            dl.draw_rounded_rect(draw_rect.clone(), node.radius.clone(), node.color.clone(), node.border_color.clone());
+        }
+    }
+
+    // 3. Draw text if present
+    if node.text.len() > 0 {
+        dl.draw_text(node.text.clone(), Point::new(cur_pos.x, cur_pos.y), node.font_size, node.color.clone(), node.is_bold);
+    }
+
+    // 4. Recursively render children
+    let mut i: usize = 0;
+    while i < node.children.len() {
+        render_node(node.children[i].clone(), cur_pos.clone(), dl);
+        i += 1;
+    }
+}
+
+pub fn render_ui(root: ElementNode) -> DisplayList {
+    let mut dl = DisplayList::new();
+    render_node(root, Point::zero(), &mut dl);
+    return dl;
+}
+
+// ==========================================
+// 7. Hit-Testing & Click Dispatching
+// ==========================================
+
+pub fn find_clicked_action(node: ElementNode, click_pos: Point, offset: Point) -> Option<string> {
+    let cur_pos = Point::new(offset.x + node.bounds.x, offset.y + node.bounds.y);
+    let world_bounds = Rect::new(cur_pos.x, cur_pos.y, node.bounds.width, node.bounds.height);
+
+    if !world_bounds.contains(click_pos.clone()) {
+        return None;
+    }
+
+    // Check children first
+    let mut i: usize = 0;
+    while i < node.children.len() {
+        let child_action = find_clicked_action(node.children[i].clone(), click_pos.clone(), cur_pos.clone());
+        if child_action.is_some() {
+            return child_action;
+        }
+        i += 1;
+    }
+
+    if node.on_click_id.len() > 0 {
+        return Some(node.on_click_id.clone());
+    }
+
+    return None;
+}
